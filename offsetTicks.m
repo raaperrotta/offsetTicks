@@ -1,13 +1,13 @@
-function offsetTicks(hAxle,~,format,trimZeros)
+function offsetTicks(ax,axName,varargin)
 % OFFSETTICKS Rule for relative axis tick labeling
 % 
 % To be used with ticklabelformat.
 % 
-% ticklabelformat(hAxes,axName,@offsetTicks) relabels the axis ticks as the
+% offsetTicks(hAxes,axName) relabels the axis ticks as the
 %   difference between each tick value and the first tick value. The first
 %   tick value takes its own value.
 % 
-% ticklabelformat(hAxes,axName,{@offsetTicks,format,trimZeros}) formats the
+% offsetTicks(hAxes,axName,format,trimZeros) formats the
 %   new labels according to the sprintf format specifier and trims trailing
 %   zeros after a decimal point if trimZeros is true.
 % 
@@ -19,21 +19,37 @@ function offsetTicks(hAxle,~,format,trimZeros)
 %   x = 1e6+(123:145);
 %   y = sind(x)+log(x);
 %   plot(x,y)
-%   ticklabelformat(gca,'x',@offsetTicks)
-%   ticklabelformat(gca,'y',{@offsetTicks,'%.3f V'})
+%   offsetTicks(gca,'x')
+%   offsetTicks(gca,'y','%.3f V')
 % 
-% See also: ticklabelformat, num2sepstr
+% See also: ticklabelformat
 % 
 % Created by:
 %   Robert Perrotta
 
+if ~isscalar(axName) % call offsetTicks separately for each named axis
+    for ii = 1:length(axName)
+        offsetTicks(ax,axName(ii),varargin{:})
+    end
+    return
+end
+
 if nargin < 4
     trimZeros = true;
+else
+    trimZeros = varargin{2};
 end
 
 if nargin < 3
     format = {}; % This allows us to call format{:} whether or not it was specified
 else
+    format = varargin{1};
+    
+    if isempty(format) % delete current listeners
+        delete(getappdata(ax,[axName,'OffsetTickListener']));
+        set(ax,[axName,'TickMode'],'auto',[axName,'TickLabelMode'],'auto')
+        return
+    end
     if strfind(format,'\n') % MATLAB interprets '\n' as a jump to the next tick label
         id = 'offsetTicks:newlineChar';
         lnk = ['<a href="matlab:warning(''off'',''',id,''')">Silence this warning.</a>'];
@@ -50,8 +66,26 @@ else
     format = {format};
 end
 
+hAxle = get(ax,[axName,'Ruler']);
+% Delete existing (and therefore conflicting) offsetTick listeners
+delete(getappdata(ax,[axName,'OffsetTickListener']));
+% Add new listener and save to appdata
+hl = addlistener(hAxle,'MarkedClean',@(hAxle,~)setOffsetTicks(hAxle,format,trimZeros));
+setappdata(ax,[axName,'OffsetTickListener'],hl)
+% Update axis now
+setOffsetTicks(hAxle,format,trimZeros)
+end
+
+function setOffsetTicks(hAxle,format,trimZeros)
 % Get the current tick values and prepare a cell array for our new labels
-ticks = get(hAxle,'Tick');
+try
+    ticks = get(hAxle,'Tick'); % R2014b to R2015b
+catch err
+    if ~strcmp(err.identifier,'MATLAB:class:AmbiguousProperty')
+        rethrow(err)
+    end
+    ticks = get(hAxle,'TickValues'); % R2016a
+end
 if isempty(ticks) % no ticks on which to operate
     return
 end
