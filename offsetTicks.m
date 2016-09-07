@@ -1,8 +1,6 @@
 function offsetTicks(ax,axName,varargin)
 % OFFSETTICKS Rule for relative axis tick labeling
 % 
-% To be used with ticklabelformat.
-% 
 % offsetTicks(hAxes,axName) relabels the axis ticks as the
 %   difference between each tick value and the first tick value. The first
 %   tick value takes its own value.
